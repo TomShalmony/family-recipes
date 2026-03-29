@@ -19,21 +19,22 @@ export interface ParsedRecipe {
   }[];
 }
 
-function parseDuration(iso8601: string | undefined): number | undefined {
+function parseDuration(iso8601: unknown): number | undefined {
   if (!iso8601) return undefined;
-  const match = iso8601.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+  const match = String(iso8601).match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
   if (!match) return undefined;
   const hours = parseInt(match[1] || "0");
   const minutes = parseInt(match[2] || "0");
   return hours * 60 + minutes || undefined;
 }
 
-function parseIngredientString(s: string): {
+function parseIngredientString(raw: unknown): {
   quantity?: number;
   unit?: string;
   name: string;
   preparation?: string;
 } {
+  const s = typeof raw === "string" ? raw : String(raw ?? "");
   // Simple regex: tries to match "1 1/2 cups flour, sifted"
   const match = s.match(
     /^([\d./½¼¾⅓⅔⅛\s]+)?\s*(tbsp|tsp|tablespoons?|teaspoons?|cups?|oz|ounces?|lbs?|pounds?|kg|g|grams?|ml|liters?|l|pinch|cloves?|pieces?|slices?)?\s*[.]?\s*(.+)$/i
@@ -137,7 +138,7 @@ export function extractJsonLd(html: string): ParsedRecipe | null {
   }
 
   // Parse ingredients
-  const rawIngredients = (recipe.recipeIngredient ?? []) as string[];
+  const rawIngredients = (recipe.recipeIngredient ?? []) as unknown[];
   const ingredients = rawIngredients.map((s) => parseIngredientString(s));
 
   // Parse servings
