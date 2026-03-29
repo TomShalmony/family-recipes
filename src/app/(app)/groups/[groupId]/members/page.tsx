@@ -6,6 +6,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ArrowLeft, Link as LinkIcon } from "lucide-react";
 import Link from "next/link";
 import { CopyInviteButton } from "@/components/group/copy-invite-button";
+import { RoleSelector } from "@/components/group/role-selector";
 
 export default async function MembersPage({
   params,
@@ -34,7 +35,7 @@ export default async function MembersPage({
   // Get all members
   const { data: members } = await supabase
     .from("group_members")
-    .select("role, joined_at, user:profiles(id, display_name)")
+    .select("id, role, joined_at, user_id, user:profiles(id, display_name)")
     .eq("group_id", groupId)
     .order("joined_at", { ascending: true });
 
@@ -85,9 +86,18 @@ export default async function MembersPage({
                   {memberUser?.display_name}
                 </span>
               </div>
-              <Badge variant="secondary" className="text-xs">
-                {member.role}
-              </Badge>
+              {isAdmin ? (
+                <RoleSelector
+                  groupId={groupId}
+                  memberId={memberUser?.id ?? ""}
+                  currentRole={member.role}
+                  isCurrentUser={memberUser?.id === user!.id}
+                />
+              ) : (
+                <Badge variant="secondary" className="text-xs">
+                  {member.role}
+                </Badge>
+              )}
             </div>
           );
         })}
