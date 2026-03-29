@@ -156,8 +156,8 @@ export default async function RecipePage({
       {/* Title */}
       <h1 className="text-2xl font-bold leading-tight">{title}</h1>
 
-      {/* Description */}
-      {description && (
+      {/* Description — skip if it's identical to the title */}
+      {description && description !== title && (
         <p className="mt-2 text-muted-foreground leading-relaxed">{description}</p>
       )}
 
@@ -276,25 +276,29 @@ export default async function RecipePage({
         <section className="mt-8 pb-4">
           <h2 className="text-lg font-semibold tracking-tight">Instructions</h2>
           <ol className="mt-4 space-y-5">
-            {instructions.map(
-              (
-                inst: {
-                  id: string;
-                  step_number: number;
-                  translation?: { text: string };
-                },
-                i: number
-              ) => (
-                <li key={inst.id} className="flex gap-4">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
-                    {i + 1}
-                  </span>
-                  <p className="pt-1 text-sm leading-relaxed">
-                    {cleanText(inst.translation?.text)}
-                  </p>
-                </li>
+            {instructions
+              .filter((inst: { translation?: { text: string } }) =>
+                cleanText(inst.translation?.text).length > 0
               )
-            )}
+              .map(
+                (
+                  inst: {
+                    id: string;
+                    step_number: number;
+                    translation?: { text: string };
+                  },
+                  i: number
+                ) => (
+                  <li key={inst.id} className="flex gap-4">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
+                      {i + 1}
+                    </span>
+                    <p className="pt-1 text-sm leading-relaxed">
+                      {cleanText(inst.translation?.text)}
+                    </p>
+                  </li>
+                )
+              )}
           </ol>
         </section>
       )}

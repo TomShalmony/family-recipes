@@ -80,13 +80,18 @@ export async function POST(request: Request) {
       // 3. Try JSON-LD extraction first
       let parsed: ParsedRecipe | null = extractJsonLd(html);
 
-      // 4. Fallback to Gemini
-      if (
-        !parsed ||
-        !parsed.title ||
-        parsed.ingredients.length === 0 ||
-        parsed.instructions.length === 0
-      ) {
+      // 4. Fallback to Gemini if extraction failed or looks low-quality
+      const looksGood = (p: ParsedRecipe) => {
+        if (!p.title) return false;
+        if (p.ingredients.length === 0 || p.instructions.length === 0) return false;
+        // Detect garbage: if only 1 ingredient and it has no meaningful name
+        if (p.ingredients.length === 1 && p.ingredients[0].name.trim().length < 3) return false;
+        // Detect if the description is identical to the title (low quality)
+        // Allow it — Gemini will do better anyway if other signals are bad
+        return true;
+      };
+
+      if (!parsed || !looksGood(parsed)) {
         parsed = await extractRecipeWithGemini(html);
       }
 

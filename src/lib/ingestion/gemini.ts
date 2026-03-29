@@ -6,7 +6,6 @@ function getAI() {
 }
 
 function stripHtml(html: string): string {
-  // Remove script, style, nav, footer, header tags and their content
   let clean = html
     .replace(/<(script|style|nav|footer|header|aside|noscript)[^>]*>[\s\S]*?<\/\1>/gi, "")
     .replace(/<[^>]+>/g, " ")
@@ -14,10 +13,9 @@ function stripHtml(html: string): string {
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
-    .replace(/&#?\w+;/g, "")
+    .replace(/&#?[\w]+;/g, "")
     .replace(/\s+/g, " ")
     .trim();
-  // Truncate to ~15k chars
   if (clean.length > 15000) clean = clean.slice(0, 15000);
   return clean;
 }
@@ -32,7 +30,7 @@ export async function extractRecipeWithGemini(
     contents: `Extract the recipe from this webpage text. Return ONLY valid JSON with this exact structure (no markdown, no code fences):
 {
   "title": "Recipe title",
-  "description": "Brief description",
+  "description": "A brief description of the dish in 1-2 sentences. MUST be different from the title — describe what it is, not just repeat the name.",
   "servings": 4,
   "prepTimeMinutes": 15,
   "cookTimeMinutes": 30,
@@ -45,15 +43,19 @@ export async function extractRecipeWithGemini(
   ]
 }
 
-If a field is unknown, use null. For ingredients without a quantity (like "salt to taste"), set quantity to null and unit to null.
-Detect the language of the recipe (en, he, or fr).
+CRITICAL RULES:
+- description must describe the dish, NOT repeat the title. If no description exists, write a brief one yourself.
+- ingredients MUST be an array where each element is ONE ingredient. Never combine multiple ingredients into a single element.
+- If an ingredient has no quantity (like "salt to taste"), set quantity to null and unit to null.
+- instructions MUST be an array where each element is ONE step. Do not combine steps.
+- Detect the language of the recipe (en, he, or fr) and set the "language" field.
+- If a field is unknown, use null.
 
 Webpage text:
 ${text}`,
   });
 
   const raw = response.text ?? "";
-  // Strip potential markdown code fences
   const jsonStr = raw.replace(/```json?\n?/g, "").replace(/```/g, "").trim();
   const parsed = JSON.parse(jsonStr);
 
@@ -88,21 +90,26 @@ export async function autoTagRecipe(
   ingredientNames: string[],
   availableTags: { slug: string; label: string }[]
 ): Promise<string[]> {
-  const tagList = availableTags.map((t) => t.slug).join(", ");
+  const tagList = availableTags.map((t) => `${t.slug} (${t.label})`).join(", ");
 
   const response = await getAI().models.generateContent({
     model: "gemini-2.0-flash",
-    contents: `Given this recipe, select ALL applicable tags from this list: [${tagList}]
+    contents: `Given this recipe, select ALL applicable tags from this exact list: [${tagList}]
 
 Recipe title: ${title}
 Ingredients: ${ingredientNames.join(", ")}
 
-Return ONLY a JSON array of tag slugs, nothing else. Example: ["main","meat","gluten-free"]`,
+Return ONLY a JSON array of tag slugs using the exact slug names from the list above, nothing else.
+Example: ["main","vegetarian","baking"]
+If no tags apply, return: []`,
   });
 
   const raw = response.text ?? "[]";
   const jsonStr = raw.replace(/```json?\n?/g, "").replace(/```/g, "").trim();
-  return JSON.parse(jsonStr);
+  const result = JSON.parse(jsonStr);
+  // Validate: only return slugs that actually exist in availableTags
+  const validSlugs = new Set(availableTags.map((t) => t.slug));
+  return (result as string[]).filter((s) => validSlugs.has(s));
 }
 
 export async function translateRecipe(
@@ -141,6 +148,9 @@ Preserve cooking terminology accurately. Return ONLY valid JSON (no markdown, no
     {"text": "translated instruction text"}
   ]
 }
+
+The ingredients array MUST have exactly ${recipe.ingredients.length} elements in the same order.
+The instructions array MUST have exactly ${recipe.instructions.length} elements in the same order.
 
 Source recipe:
 Title: ${recipe.title}
