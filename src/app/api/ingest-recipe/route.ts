@@ -160,18 +160,21 @@ export async function POST(request: Request) {
         instructions: parsed.instructions.map((i) => ({ text: i.text })),
       };
 
-      // Translate to the other 2 languages
+      // Translate to the other 2 languages (retry once on failure, skip rather than store garbage)
       const targetLangs = allLangs.filter((l) => l !== validLang);
       for (const targetLang of targetLangs) {
-        try {
-          translations[targetLang] = await translateRecipe(
-            translations[validLang],
-            validLang,
-            targetLang
-          );
-        } catch {
-          // Translation failure — copy source as fallback
-          translations[targetLang] = translations[validLang];
+        for (let attempt = 0; attempt < 2; attempt++) {
+          try {
+            translations[targetLang] = await translateRecipe(
+              translations[validLang],
+              validLang,
+              targetLang
+            );
+            break;
+          } catch {
+            // On second failure, leave translations[targetLang] unset —
+            // the display layer falls back to the source language gracefully.
+          }
         }
       }
 
@@ -191,8 +194,9 @@ export async function POST(request: Request) {
         })
         .eq("id", recipeId);
 
-      // Save recipe translations
+      // Save recipe translations (only for languages we actually have)
       for (const lang of allLangs) {
+        if (!translations[lang]) continue;
         await supabase.from("recipe_translations").insert({
           recipe_id: recipeId,
           language: lang,
@@ -219,6 +223,7 @@ export async function POST(request: Request) {
 
         if (savedIng) {
           for (const lang of allLangs) {
+            if (!translations[lang]) continue;
             const translatedIng = translations[lang].ingredients[i];
             if (translatedIng) {
               await supabase.from("ingredient_translations").insert({
@@ -245,6 +250,7 @@ export async function POST(request: Request) {
 
         if (savedInst) {
           for (const lang of allLangs) {
+            if (!translations[lang]) continue;
             const translatedInst = translations[lang].instructions[i];
             if (translatedInst) {
               await supabase.from("instruction_translations").insert({

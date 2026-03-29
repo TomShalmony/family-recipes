@@ -74,9 +74,10 @@ export default async function RecipePage({
     );
   }
 
-  const translation = pickTranslation(
-    recipe.recipe_translations as { language: string; title: string; description?: string }[]
-  );
+  const allTranslations = recipe.recipe_translations as { language: string; title: string; description?: string }[];
+  const translation = pickTranslation(allTranslations);
+  const translationLang = translation?.language ?? lang;
+  const showingFallback = translationLang !== lang;
 
   const ingredients = recipe.ingredients
     ?.sort(
@@ -159,6 +160,13 @@ export default async function RecipePage({
       {/* Description — skip if it's identical to the title */}
       {description && description !== title && (
         <p className="mt-2 text-muted-foreground leading-relaxed">{description}</p>
+      )}
+
+      {/* Language fallback notice */}
+      {showingFallback && (
+        <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">
+          Translation not available — showing in original language
+        </p>
       )}
 
       {/* Tags */}
