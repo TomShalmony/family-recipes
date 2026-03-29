@@ -187,6 +187,14 @@ export function extractJsonLd(html: string): ParsedRecipe | null {
     imageUrl = (recipe.image as { url?: string }).url;
   }
 
+  // Detect language from declared field or from Unicode content
+  let language: string | undefined = recipe.inLanguage ? String(recipe.inLanguage) : undefined;
+  if (!language) {
+    const sampleText = String(recipe.name ?? "") + " " + String(recipe.description ?? "");
+    if (/[\u0590-\u05FF]/.test(sampleText)) language = "he";
+    else if (/[àâçéèêëîïôùûüœæ]/i.test(sampleText)) language = "fr";
+  }
+
   return {
     title: decodeEntities(String(recipe.name ?? "")),
     description: recipe.description ? decodeEntities(String(recipe.description)) : undefined,
@@ -195,7 +203,7 @@ export function extractJsonLd(html: string): ParsedRecipe | null {
     cookTimeMinutes: parseDuration(recipe.cookTime as string | undefined),
     totalTimeMinutes: parseDuration(recipe.totalTime as string | undefined),
     imageUrl,
-    language: recipe.inLanguage ? String(recipe.inLanguage) : undefined,
+    language,
     ingredients,
     instructions,
   };

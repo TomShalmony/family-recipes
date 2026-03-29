@@ -84,10 +84,13 @@ export async function POST(request: Request) {
       const looksGood = (p: ParsedRecipe) => {
         if (!p.title) return false;
         if (p.ingredients.length === 0 || p.instructions.length === 0) return false;
-        // Detect garbage: if only 1 ingredient and it has no meaningful name
-        if (p.ingredients.length === 1 && p.ingredients[0].name.trim().length < 3) return false;
-        // Detect if the description is identical to the title (low quality)
-        // Allow it — Gemini will do better anyway if other signals are bad
+        if (p.ingredients.length === 1) {
+          const name = p.ingredients[0].name.trim();
+          // Blank/garbage ingredient name
+          if (name.length < 3) return false;
+          // All ingredients crammed into one comma-separated string
+          if ((name.match(/,/g) ?? []).length >= 3) return false;
+        }
         return true;
       };
 
