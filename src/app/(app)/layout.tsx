@@ -30,6 +30,7 @@ export default async function AppLayout({
         displayName: profile?.display_name ?? user.email ?? "",
         avatarUrl: profile?.avatar_url,
       }}
+      lang={profile?.preferred_language ?? "en"}
     >
       {children}
     </AppShell>
