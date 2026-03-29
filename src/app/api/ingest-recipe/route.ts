@@ -1,22 +1,13 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { extractJsonLd } from "@/lib/ingestion/extract-jsonld";
 import { extractRecipeWithGemini, autoTagRecipe, translateRecipe } from "@/lib/ingestion/gemini";
 import { normalizeIngredient } from "@/lib/ingestion/normalize-units";
 import type { ParsedRecipe } from "@/lib/ingestion/extract-jsonld";
 
-// Lazy-init service role client (avoid build-time errors when env vars aren't set)
-function getSupabaseAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
-}
-
 export async function POST(request: Request) {
   try {
-    // Auth check
+    // Auth check — use user's session for all DB operations (RLS enforced)
     const supabase = await createServerClient();
     const {
       data: { user },
@@ -49,7 +40,7 @@ export async function POST(request: Request) {
     }
 
     // 1. Create pending recipe
-    const { data: recipe, error: insertError } = await getSupabaseAdmin()
+    const { data: recipe, error: insertError } = await supabase
       .from("recipes")
       .insert({
         group_id: groupId,
@@ -112,7 +103,7 @@ export async function POST(request: Request) {
       });
 
       // 6. Auto-tag
-      const { data: tags } = await getSupabaseAdmin()
+      const { data: tags } = await supabase
         .from("tags")
         .select("id, slug, tag_translations(label, language)")
         .order("sort_order");
@@ -180,8 +171,9 @@ export async function POST(request: Request) {
       }
 
       // 8. Save everything to DB
+
       // Update recipe metadata
-      await getSupabaseAdmin()
+      await supabase
         .from("recipes")
         .update({
           original_language: validLang,
@@ -196,7 +188,7 @@ export async function POST(request: Request) {
 
       // Save recipe translations
       for (const lang of allLangs) {
-        await getSupabaseAdmin().from("recipe_translations").insert({
+        await supabase.from("recipe_translations").insert({
           recipe_id: recipeId,
           language: lang,
           title: translations[lang].title,
@@ -207,7 +199,7 @@ export async function POST(request: Request) {
       // Save ingredients + translations
       for (let i = 0; i < normalizedIngredients.length; i++) {
         const ing = normalizedIngredients[i];
-        const { data: savedIng } = await getSupabaseAdmin()
+        const { data: savedIng } = await supabase
           .from("ingredients")
           .insert({
             recipe_id: recipeId,
@@ -224,7 +216,7 @@ export async function POST(request: Request) {
           for (const lang of allLangs) {
             const translatedIng = translations[lang].ingredients[i];
             if (translatedIng) {
-              await getSupabaseAdmin().from("ingredient_translations").insert({
+              await supabase.from("ingredient_translations").insert({
                 ingredient_id: savedIng.id,
                 language: lang,
                 name: translatedIng.name,
@@ -237,7 +229,7 @@ export async function POST(request: Request) {
 
       // Save instructions + translations
       for (let i = 0; i < parsed.instructions.length; i++) {
-        const { data: savedInst } = await getSupabaseAdmin()
+        const { data: savedInst } = await supabase
           .from("instructions")
           .insert({
             recipe_id: recipeId,
@@ -250,7 +242,7 @@ export async function POST(request: Request) {
           for (const lang of allLangs) {
             const translatedInst = translations[lang].instructions[i];
             if (translatedInst) {
-              await getSupabaseAdmin().from("instruction_translations").insert({
+              await supabase.from("instruction_translations").insert({
                 instruction_id: savedInst.id,
                 language: lang,
                 text: translatedInst.text,
@@ -264,7 +256,7 @@ export async function POST(request: Request) {
       for (const slug of tagSlugs) {
         const tag = availableTags.find((t) => t.slug === slug);
         if (tag) {
-          await getSupabaseAdmin().from("recipe_tags").insert({
+          await supabase.from("recipe_tags").insert({
             recipe_id: recipeId,
             tag_id: tag.id,
           });
@@ -278,7 +270,7 @@ export async function POST(request: Request) {
       });
     } catch (err) {
       // Mark recipe as failed
-      await getSupabaseAdmin()
+      await supabase
         .from("recipes")
         .update({
           ingestion_status: "failed",
