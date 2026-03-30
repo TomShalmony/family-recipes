@@ -35,9 +35,18 @@ export default async function MembersPage({
   // Get all members
   const { data: members } = await supabase
     .from("group_members")
-    .select("id, role, joined_at, user_id, user:profiles(id, display_name)")
+    .select("id, role, joined_at, user_id")
     .eq("group_id", groupId)
     .order("joined_at", { ascending: true });
+
+  // Fetch profiles separately (group_members.user_id → auth.users, not profiles, so no auto-join)
+  const userIds = (members ?? []).map((m) => m.user_id);
+  const { data: profileRows } = userIds.length
+    ? await supabase.from("profiles").select("id, display_name").in("id", userIds)
+    : { data: [] };
+  const profileMap = Object.fromEntries(
+    (profileRows ?? []).map((p) => [p.id, p])
+  );
 
   return (
     <div>
@@ -70,10 +79,10 @@ export default async function MembersPage({
 
       <div className="mt-4 space-y-2">
         {members?.map((member) => {
-          const memberUser = member.user as unknown as { id: string; display_name: string } | null;
+          const memberUser = profileMap[member.user_id] ?? null;
           return (
             <div
-              key={memberUser?.id}
+              key={member.user_id}
               className="flex items-center justify-between rounded-lg border p-3"
             >
               <div className="flex items-center gap-3">
@@ -83,15 +92,15 @@ export default async function MembersPage({
                   </AvatarFallback>
                 </Avatar>
                 <span className="text-sm font-medium">
-                  {memberUser?.display_name}
+                  {memberUser?.display_name ?? "Unknown"}
                 </span>
               </div>
               {isAdmin ? (
                 <RoleSelector
                   groupId={groupId}
-                  memberId={memberUser?.id ?? ""}
+                  memberId={member.user_id}
                   currentRole={member.role}
-                  isCurrentUser={memberUser?.id === user!.id}
+                  isCurrentUser={member.user_id === user!.id}
                 />
               ) : (
                 <Badge variant="secondary" className="text-xs">
