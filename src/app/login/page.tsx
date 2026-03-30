@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +18,8 @@ export default function LoginPage() {
   const [magicLinkSent, setMagicLinkSent] = useState(false);
   const [error, setError] = useState("");
   const supabase = createClient();
+  const searchParams = useSearchParams();
+  const next = searchParams.get("next") ?? "/groups";
 
   async function handleEmailLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -32,7 +35,7 @@ export default function LoginPage() {
       setError(error.message);
       setLoading(false);
     } else {
-      window.location.href = "/groups";
+      window.location.href = next;
     }
   }
 
@@ -63,7 +66,7 @@ export default function LoginPage() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
       },
     });
     if (error) setError(error.message);
