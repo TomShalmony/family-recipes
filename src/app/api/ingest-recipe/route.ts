@@ -283,21 +283,20 @@ export async function POST(request: Request) {
         title: translations["en"]?.title ?? parsed.title,
       });
     } catch (err) {
-      // Mark recipe as failed
-      await supabase
-        .from("recipes")
-        .update({
-          ingestion_status: "failed",
-          ingestion_error: err instanceof Error ? err.message : "Unknown error",
-        })
-        .eq("id", recipeId);
+      // Delete the recipe shell — no point keeping a broken stub
+      await supabase.from("recipes").delete().eq("id", recipeId);
+
+      // Give a friendly error for quota exhaustion
+      const raw = err instanceof Error ? err.message : String(err);
+      let userMessage = "Failed to process recipe. Please try again.";
+      if (raw.includes("RESOURCE_EXHAUSTED") || raw.includes("429") || raw.includes("quota")) {
+        userMessage = "AI quota exceeded. Please try again in a few minutes or check your Gemini API billing.";
+      } else if (raw.includes("Failed to fetch URL")) {
+        userMessage = "Could not reach that URL. Make sure it's a public recipe page.";
+      }
 
       return NextResponse.json(
-        {
-          recipeId,
-          status: "failed",
-          error: err instanceof Error ? err.message : "Unknown error",
-        },
+        { status: "failed", error: userMessage },
         { status: 500 }
       );
     }
