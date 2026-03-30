@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Plus, Users } from "lucide-react";
 import Link from "next/link";
+import { JoinGroupFormClient } from "./join-form";
 
 export default async function GroupsPage() {
   const supabase = await createClient();
@@ -89,18 +90,7 @@ function JoinGroupForm() {
       <summary className="cursor-pointer text-sm font-medium text-muted-foreground">
         Have an invite code? Join a group
       </summary>
-      <form action="/groups/join" method="GET" className="mt-3 flex gap-2">
-        <input
-          name="code"
-          type="text"
-          placeholder="Paste invite code"
-          className="flex-1 rounded-md border px-3 py-2 text-sm"
-          required
-        />
-        <Button type="submit" size="sm" variant="outline">
-          Join
-        </Button>
-      </form>
+      <JoinGroupFormClient />
     </details>
   );
 }
